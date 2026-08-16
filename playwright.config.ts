@@ -39,6 +39,16 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"], storageState: STORAGE_STATE },
       dependencies: ["setup"],
     },
+    // WebKit is not redundant coverage. The canvas is an iframe driven
+    // entirely from the parent realm, and that is exactly where the engines
+    // disagree: a sandboxed canvas rendered correctly in Chromium and dropped
+    // every event in Safari, which a chromium-only suite reported as green
+    // while the editor was completely unusable for Safari users.
+    {
+      name: "webkit",
+      use: { ...devices["Desktop Safari"], storageState: STORAGE_STATE },
+      dependencies: ["setup"],
+    },
   ],
 
   webServer: {

@@ -9,6 +9,21 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- The editor now works in Safari. The canvas iframe carried
+  `sandbox="allow-same-origin"`, and WebKit gives a script-disabled browsing
+  context no events at all: the parent's listeners on the iframe document never
+  fired, so the page rendered correctly and every click, drag and hover was
+  silently dropped. Selecting a node did nothing, the inspector stayed empty and
+  components could not be dragged onto the canvas — in Chromium, all of it
+  worked. The attribute is gone; nothing in the canvas can execute, because no
+  block type emits raw HTML and authored content never reaches
+  `dangerouslySetInnerHTML`.
+- The Playwright suite now runs in WebKit as well as Chromium. The two specs
+  that already covered this — "clicking an element selects it and fills the
+  inspector" and the palette drag — passed throughout, because a chromium-only
+  suite cannot see an engine-specific defect in the one part of the editor that
+  depends on cross-realm event delivery.
+
 - `npm run build` now runs `prisma generate` before `next build`. The Prisma
   client is generated into `src/generated/prisma`, which is gitignored, so a
   clean checkout — every Vercel build, and every fresh clone — compiled against

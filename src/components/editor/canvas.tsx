@@ -419,9 +419,23 @@ export function Canvas({
           title="Page canvas"
           className="block h-full w-full border-0 bg-white shadow-lg"
           style={{ minHeight: 600 }}
-          // Same-origin so the parent can reach contentDocument; scripts stay
-          // off because nothing inside the canvas needs to execute.
-          sandbox="allow-same-origin"
+          // Deliberately NOT sandboxed.
+          //
+          // `sandbox="allow-same-origin"` reads like free hardening: the canvas
+          // executes nothing, so denying scripts should cost nothing. It costs
+          // Safari. WebKit treats a script-disabled browsing context as one
+          // that receives no events either — the parent's listeners on
+          // contentDocument never fire, so the page renders perfectly and every
+          // click, pointerdown and mouseover is dropped. The editor looks
+          // finished and responds to nothing. Chromium delivers those events,
+          // which is how this shipped past a chromium-only e2e suite.
+          //
+          // Removing it gives up no real defence: no block type emits raw HTML,
+          // and the renderer never puts authored content through
+          // dangerouslySetInnerHTML, so there is nothing here to execute. A
+          // custom-code or embed block would change that — it needs its own
+          // isolated frame, because re-adding this attribute only breaks Safari
+          // again without stopping anything.
           data-preview={previewMode ? "" : undefined}
         />
       </div>
