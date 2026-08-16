@@ -66,6 +66,41 @@ the PR early.
 `src/lib/env.ts` refuses to boot a production build whose app and sites hosts
 share a registrable domain.
 
+### Without custom domains (app-only)
+
+Vercel gives a project one hostname, `<project>.vercel.app`. It does **not**
+route `{slug}.<project>.vercel.app` — wildcard subdomains exist only on custom
+domains. So until you own a domain, the published surface has no host it can be
+reached on, and the deploy covers marketing, auth, dashboard and editor only.
+
+Set both app-facing hosts to the assigned URL and park the sites host on a
+reserved TLD:
+
+| Variable | Value |
+|---|---|
+| `NEXT_PUBLIC_MARKETING_HOST` | `<project>.vercel.app` |
+| `NEXT_PUBLIC_APP_HOST` | `<project>.vercel.app` |
+| `NEXT_PUBLIC_SITES_HOST` | `sites.invalid` |
+
+`.invalid` is reserved by [RFC 2606](https://datatracker.ietf.org/doc/html/rfc2606)
+and can never be registered, so nothing resolves to it and `routeHost` never
+matches the published branch. It also keeps the registrable domain distinct from
+`vercel.app`, which is what stops `assertEnv` from failing the boot — the guard
+stays fully armed rather than being loosened for a demo.
+
+Two consequences worth knowing before you look at the deploy:
+
+- **The marketing page is unreachable.** `src/app/page.tsx` redirects `/` to
+  `/dashboard` on the app surface, so the assigned URL lands on the dashboard,
+  or on `/signin` when signed out. Mapping the URL to the marketing surface
+  instead would fix that and break session refresh — `proxy.ts` only calls
+  `supabase.auth.getUser()` on the app surface — so this is the better trade.
+- **Publishing still works, viewing does not.** The publish action writes
+  `publishedContent` normally; there is simply no host that serves it.
+
+Both resolve the moment a sites domain exists: add it as a wildcard in Vercel,
+change `NEXT_PUBLIC_SITES_HOST`, and redeploy. No code changes.
+
 ---
 
 ## 3. Vercel

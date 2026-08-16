@@ -42,8 +42,10 @@ next-env.d.ts
 
 /src/generated/prisma
 
-# Keep the committed env template
+# Keep the committed env templates. The filled-in `.env.vercel` stays ignored
+# by the `.env*` rule above — only the placeholder template is tracked.
 !.env.example
+!.env.vercel.template
 e2e/.auth/
 test-results/
 playwright-report/
