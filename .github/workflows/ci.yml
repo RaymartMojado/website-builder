@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Typecheck, lint, test, build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    env:
+      # The fixed values `supabase start` prints identically on every machine.
+      # Not secrets — see .env.test.
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres?schema=public
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_MARKETING_HOST: localhost:3000
+      NEXT_PUBLIC_APP_HOST: app.localhost:3000
+      NEXT_PUBLIC_SITES_HOST: sites.localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 22, not 20: supabase-js has deprecated 20, and the global
+          # WebSocket it expects only exists from 22 onwards.
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase
+        run: supabase start
+
+      - name: Capture Supabase keys
+        run: |
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(supabase status -o json | jq -r '.ANON_KEY')" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status -o json | jq -r '.SERVICE_ROLE_KEY')" >> "$GITHUB_ENV"
+
+      - name: Apply migrations
+        run: |
+          npx prisma migrate deploy
+          npx prisma generate
+
+      # Written so the suites, which load .env.test with override, see the
+      # same local stack CI just started.
+      - name: Write .env.test
+        run: |
+          {
+            echo "DATABASE_URL=$DATABASE_URL"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY"
+            echo "NEXT_PUBLIC_MARKETING_HOST=$NEXT_PUBLIC_MARKETING_HOST"
+            echo "NEXT_PUBLIC_APP_HOST=$NEXT_PUBLIC_APP_HOST"
+            echo "NEXT_PUBLIC_SITES_HOST=$NEXT_PUBLIC_SITES_HOST"
+          } > .env.test
+          cp .env.test .env
+
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+
+      - name: Security audit
+        run: npm audit --audit-level=high
+
+      - run: npm run build
+
+  e2e:
+    name: Browser end-to-end
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: verify
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres?schema=public
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_MARKETING_HOST: localhost:3000
+      NEXT_PUBLIC_APP_HOST: app.localhost:3000
+      NEXT_PUBLIC_SITES_HOST: sites.localhost:3000
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - run: supabase start
+
+      - name: Capture Supabase keys
+        run: |
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(supabase status -o json | jq -r '.ANON_KEY')" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status -o json | jq -r '.SERVICE_ROLE_KEY')" >> "$GITHUB_ENV"
+
+      - name: Prepare database and env
+        run: |
+          npx prisma migrate deploy
+          npx prisma generate
+          {
+            echo "DATABASE_URL=$DATABASE_URL"
+            echo "NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SUPABASE_SERVICE_ROLE_KEY"
+            echo "NEXT_PUBLIC_MARKETING_HOST=$NEXT_PUBLIC_MARKETING_HOST"
+            echo "NEXT_PUBLIC_APP_HOST=$NEXT_PUBLIC_APP_HOST"
+            echo "NEXT_PUBLIC_SITES_HOST=$NEXT_PUBLIC_SITES_HOST"
+          } > .env
+          cp .env .env.test
+          npx tsx scripts/seed-demo.ts
+
+      - run: npx playwright install --with-deps chromium
+
+      - run: npx playwright test
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
