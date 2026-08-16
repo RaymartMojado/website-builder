@@ -237,8 +237,29 @@ export function Logo({ props, attrs, ctx }: BlockProps) {
   const resolved = resolveLink(parseLink(props.link), ctx.links);
 
   const content = src ? (
+    // The image fills the node's own box rather than sizing itself.
+    //
+    // `width: auto` used to be hardcoded here, and because an inline style
+    // outranks the compiled class, the node's width was inert: the anchor
+    // resized and the picture inside it did not. `border-radius` had the same
+    // problem from the other direction — it applied to the anchor, while the
+    // square image sat on top of the rounded corners it was meant to have.
+    //
+    // `contain` rather than `fill`: a logo is the one image on a site that must
+    // never be stretched. It does mean a width-only change re-boxes the image
+    // without scaling it, since the aspect ratio is then held by the height.
     // eslint-disable-next-line @next/next/no-img-element -- see Image below
-    <img src={src} alt={alt} style={{ height: "100%", width: "auto", display: "block" }} />
+    <img
+      src={src}
+      alt={alt}
+      style={{
+        height: "100%",
+        width: "100%",
+        objectFit: "contain",
+        display: "block",
+        borderRadius: "inherit",
+      }}
+    />
   ) : (
     text
   );

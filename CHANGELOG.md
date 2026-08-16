@@ -9,6 +9,17 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- A Logo's image now honours the styles set on it. The `<img>` carried a
+  hardcoded inline `width: auto`, and an inline style outranks the compiled
+  class, so resizing the node stretched the anchor while the picture inside it
+  stayed put. `border-radius` failed the other way around: it applied to the
+  anchor, and the square image covered the rounded corners. The image now fills
+  the node's box and inherits its radius. It uses `object-fit: contain`, so a
+  logo is never stretched — which does mean changing width alone re-boxes the
+  image rather than scaling it, because the aspect ratio is then held by the
+  height. The resize handles write width only (`resize-handles.tsx`), so
+  scaling a logo by dragging still needs a height to be set alongside it.
+
 - The app is readable again on a machine set to dark mode. `globals.css` still
   carried create-next-app boilerplate whose `body { background; color }` rule
   sat outside any cascade layer, so it overrode the `bg-neutral-50
