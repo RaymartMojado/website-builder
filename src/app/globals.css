@@ -1,26 +1,35 @@
 @import "tailwindcss";
 
+/*
+ * Deliberately almost empty.
+ *
+ * What used to be here was create-next-app boilerplate, and every part of it
+ * worked against the app rather than for it:
+ *
+ *   - `body { background; color }` sat OUTSIDE any cascade layer, and unlayered
+ *     CSS beats Tailwind v4's layered utilities whatever their specificity. So
+ *     it quietly overrode the `bg-neutral-50 text-neutral-900` that layout.tsx
+ *     sets on <body>. In light mode the values nearly matched and it looked
+ *     fine. Under `prefers-color-scheme: dark` it repainted body text
+ *     near-white while every card kept its `bg-white`, and the dashboard became
+ *     white-on-white — unreadable, with nothing in any component to blame.
+ *
+ *   - `--font-sans` and `--font-mono` were mapped to `var(--font-geist-*)`,
+ *     which nothing defines: no font is loaded in layout.tsx. `font-family`
+ *     then resolved to an invalid value and inherited the body font, so every
+ *     `font-mono` label rendered in Arial rather than a monospace face.
+ *
+ *   - `--color-background` was redefined here as the app's chrome colour, but
+ *     it is also a SITE theme token (see registry.ts and lib/styles/compile.ts).
+ *     Published pages share this root layout, so the two collided on :root and
+ *     were settled only by stylesheet order.
+ *
+ * This is a light UI — white cards, neutral borders, no dark variants in any
+ * component. `color-scheme: light` states that, which also stops the OS
+ * painting form controls, scrollbars and autofill in dark chrome. Genuine
+ * dark-mode support is a design pass across every component, not a token swap,
+ * so it is not pretended at here.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color-scheme: light;
 }

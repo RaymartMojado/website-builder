@@ -9,6 +9,26 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- The app is readable again on a machine set to dark mode. `globals.css` still
+  carried create-next-app boilerplate whose `body { background; color }` rule
+  sat outside any cascade layer, so it overrode the `bg-neutral-50
+  text-neutral-900` that `layout.tsx` sets on `<body>` — unlayered CSS beats
+  Tailwind v4's layered utilities regardless of specificity. Under
+  `prefers-color-scheme: dark` that repainted body text near-white while every
+  card kept `bg-white`, leaving the dashboard white-on-white: site names,
+  section headings, field labels and the Rename button were all invisible. The
+  UI is a light design with no dark variants in any component, so it now
+  declares `color-scheme: light` rather than half-flipping. Real dark-mode
+  support remains unbuilt.
+- `font-mono` renders in a monospace face. The same boilerplate mapped
+  `--font-mono` and `--font-sans` to `var(--font-geist-*)`, which nothing
+  defines because no font is loaded, so the seven `font-mono` labels resolved
+  to an invalid value and inherited Arial from `body`.
+- Published pages no longer collide with the app over `--color-background`.
+  That token is a site theme value produced by `lib/styles/compile.ts`, but the
+  boilerplate also defined it on `:root` as app chrome; since published pages
+  share the root layout, which one won came down to stylesheet order.
+
 - The editor now works in Safari. The canvas iframe carried
   `sandbox="allow-same-origin"`, and WebKit gives a script-disabled browsing
   context no events at all: the parent's listeners on the iframe document never
