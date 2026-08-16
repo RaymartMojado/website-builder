@@ -59,6 +59,13 @@ export interface LinkContext {
   pagePaths: Map<string, string>;
   /** assetId → public URL. */
   assetUrls?: Map<string, string>;
+  /**
+   * Prefix for links that stay inside the site, set only when the site is
+   * being previewed on the app's own origin at /s/{slug}. Stored paths are
+   * relative to the site root, so without this every nav link would resolve
+   * against the app instead — "/about" would land on the app's own /about.
+   */
+  basePath?: string;
 }
 
 export interface ResolvedLink {
@@ -78,7 +85,8 @@ export function resolveLink(link: Link | undefined | null, ctx: LinkContext): Re
       // A deleted page renders as a non-link rather than a wrong link. The
       // editor surfaces this properly via the referrer check before delete.
       if (!path) return { href: undefined, broken: true };
-      return { href: link.hash ? `${path}#${link.hash}` : path, broken: false };
+      const target = `${ctx.basePath ?? ""}${path}`;
+      return { href: link.hash ? `${target}#${link.hash}` : target, broken: false };
     }
 
     case "external":

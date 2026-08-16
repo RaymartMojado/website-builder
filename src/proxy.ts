@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { generateNonce, securityHeaders, type Surface } from "@/lib/security/headers";
+import { PREVIEW_PREFIX, sitesHostIsRoutable } from "@/lib/sites/subdomain";
 
 /**
  * Host-based routing, security headers, and Supabase session refresh.
@@ -35,6 +36,32 @@ export interface Routed {
   slug?: string;
 }
 
+/**
+ * Same-origin preview: /s/{slug}/... resolves to the published surface.
+ *
+ * Wildcard subdomains require a domain you own, so a deployment without one
+ * has nowhere to serve sites from and they become unviewable. This puts them
+ * back within reach on the app's own origin.
+ *
+ * It is a deliberate downgrade, not the intended shape. Published content
+ * served here shares an origin with the session cookie, which is exactly the
+ * isolation the separate registrable domain exists to provide. That is
+ * tolerable only while the account owner is the only person authoring content.
+ * Configuring a real NEXT_PUBLIC_SITES_HOST switches this off on its own.
+ */
+export function routePreviewPath(
+  pathname: string,
+  sitesHost: string = SITES_HOST,
+): { slug: string; path: string } | null {
+  if (sitesHostIsRoutable(sitesHost)) return null;
+  if (!pathname.startsWith(`${PREVIEW_PREFIX}/`)) return null;
+
+  const [slug, ...segments] = pathname.slice(PREVIEW_PREFIX.length + 1).split("/");
+  if (!slug) return null;
+
+  return { slug, path: segments.length > 0 ? `/${segments.join("/")}` : "/" };
+}
+
 export function routeHost(hostHeader: string | null): Routed {
   const host = stripPort(hostHeader ?? "");
   const sitesRoot = stripPort(SITES_HOST);
@@ -56,7 +83,24 @@ export function routeHost(hostHeader: string | null): Routed {
 }
 
 export async function proxy(request: NextRequest) {
-  const { surface, slug } = routeHost(request.headers.get("host"));
+  const routed = routeHost(request.headers.get("host"));
+
+  let surface = routed.surface;
+  let slug = routed.slug;
+  /** What the site itself should treat as the path, once any prefix is off. */
+  let contentPath = request.nextUrl.pathname;
+
+  // Only ever an addition to host routing: a real sites host still wins, and
+  // routePreviewPath returns null whenever one is configured.
+  if (surface !== "published") {
+    const preview = routePreviewPath(request.nextUrl.pathname);
+    if (preview) {
+      surface = "published";
+      slug = preview.slug;
+      contentPath = preview.path;
+    }
+  }
+
   const isSecure = request.nextUrl.protocol === "https:";
   const nonce = generateNonce();
 
@@ -82,7 +126,7 @@ export async function proxy(request: NextRequest) {
     // route re-checks x-surface, so hitting /site/foo on the app host 404s
     // rather than serving customer content from the wrong origin.
     const url = request.nextUrl.clone();
-    url.pathname = `/site/${slug}${request.nextUrl.pathname}`;
+    url.pathname = `/site/${slug}${contentPath}`;
     response = NextResponse.rewrite(url, { request: { headers: requestHeaders } });
   } else {
     response = NextResponse.next({ request: { headers: requestHeaders } });

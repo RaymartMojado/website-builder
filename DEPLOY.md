@@ -88,18 +88,38 @@ matches the published branch. It also keeps the registrable domain distinct from
 `vercel.app`, which is what stops `assertEnv` from failing the boot — the guard
 stays fully armed rather than being loosened for a demo.
 
-Two consequences worth knowing before you look at the deploy:
+One consequence worth knowing before you look at the deploy:
 
 - **The marketing page is unreachable.** `src/app/page.tsx` redirects `/` to
   `/dashboard` on the app surface, so the assigned URL lands on the dashboard,
   or on `/signin` when signed out. Mapping the URL to the marketing surface
   instead would fix that and break session refresh — `proxy.ts` only calls
   `supabase.auth.getUser()` on the app surface — so this is the better trade.
-- **Publishing still works, viewing does not.** The publish action writes
-  `publishedContent` normally; there is simply no host that serves it.
 
-Both resolve the moment a sites domain exists: add it as a wildcard in Vercel,
+It resolves the moment a sites domain exists: add it as a wildcard in Vercel,
 change `NEXT_PUBLIC_SITES_HOST`, and redeploy. No code changes.
+
+### Same-origin previews
+
+Because an unroutable sites host would otherwise leave published sites with
+nowhere to live, they are served on the app's own origin at `/s/{slug}`
+instead. `routePreviewPath` in `proxy.ts` turns that path into the published
+surface, and `publishedUrl` points every "view site" link at it, so publishing
+and viewing both work with no domain at all.
+
+This is a downgrade, and it is worth being clear about what it costs. Published
+content is rendered on the origin that holds the session cookie — precisely the
+isolation the separate registrable domain exists to provide. A stored XSS in
+authored content would run against the app origin rather than a throwaway one.
+Today nothing in the builder can author a script: no block type emits raw HTML
+and the renderer never passes authored content to `dangerouslySetInnerHTML`. So
+the exposure is theoretical **while you are the only author**, and stops being
+theoretical the moment other people can publish through your instance.
+
+It switches itself off automatically. `sitesHostIsRoutable` treats any
+non-`.invalid` host as real, so setting `NEXT_PUBLIC_SITES_HOST` to a domain you
+own restores subdomain serving and disables the `/s/` route in the same
+redeploy — the guard in `src/lib/env.ts` stays armed throughout.
 
 ---
 

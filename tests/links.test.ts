@@ -97,3 +97,31 @@ describe("resolution", () => {
     expect(resolveLink(undefined, ctx).href).toBeUndefined();
   });
 });
+
+describe("basePath for same-origin previews", () => {
+  const previewCtx: LinkContext = {
+    pagePaths: new Map([
+      ["home", "/"],
+      ["about", "/about"],
+    ]),
+    basePath: "/s/acme",
+  };
+
+  it("prefixes internal page links so they stay inside the preview", () => {
+    expect(resolveLink({ kind: "page", pageId: "about" }, previewCtx).href).toBe("/s/acme/about");
+    expect(resolveLink({ kind: "page", pageId: "home" }, previewCtx).href).toBe("/s/acme/");
+  });
+
+  it("keeps the hash after the prefix", () => {
+    expect(resolveLink({ kind: "page", pageId: "about", hash: "team" }, previewCtx).href).toBe(
+      "/s/acme/about#team",
+    );
+  });
+
+  it("never rewrites links that leave the site", () => {
+    expect(resolveLink({ kind: "external", url: "https://example.com" }, previewCtx).href).toBe(
+      "https://example.com",
+    );
+    expect(resolveLink({ kind: "email", address: "a@b.com" }, previewCtx).href).toBe("mailto:a@b.com");
+  });
+});

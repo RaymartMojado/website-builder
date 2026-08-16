@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { RESERVED_SUBDOMAINS, suggestSubdomain, validateSubdomain } from "@/lib/sites/subdomain";
+import {
+  RESERVED_SUBDOMAINS,
+  publishedUrl,
+  sitesHostIsRoutable,
+  suggestSubdomain,
+  validateSubdomain,
+} from "@/lib/sites/subdomain";
 
 describe("subdomain validation", () => {
   it("accepts ordinary names", () => {
@@ -59,5 +65,26 @@ describe("subdomain suggestion", () => {
       expect(slug.startsWith("-")).toBe(false);
       expect(slug.endsWith("-")).toBe(false);
     }
+  });
+});
+
+describe("published URLs when there is no sites domain", () => {
+  it("treats a parked or empty sites host as unable to serve sites", () => {
+    expect(sitesHostIsRoutable("sites.invalid")).toBe(false);
+    expect(sitesHostIsRoutable("")).toBe(false);
+    expect(sitesHostIsRoutable("sites.localhost:3000")).toBe(true);
+    expect(sitesHostIsRoutable("mybuilder.site")).toBe(true);
+  });
+
+  it("falls back to a same-origin path so a site is previewable at all", () => {
+    expect(publishedUrl("acme", "/", "sites.invalid")).toBe("/s/acme");
+    expect(publishedUrl("acme", "/about", "sites.invalid")).toBe("/s/acme/about");
+  });
+
+  it("prefers the real subdomain as soon as one is configured", () => {
+    expect(publishedUrl("acme", "/", "mybuilder.site")).toBe("https://acme.mybuilder.site");
+    expect(publishedUrl("acme", "/about", "sites.localhost:3000")).toBe(
+      "http://acme.sites.localhost:3000/about",
+    );
   });
 });

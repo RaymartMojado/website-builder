@@ -33,6 +33,24 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Added
 
+- Published sites are now viewable without owning a domain. When
+  `NEXT_PUBLIC_SITES_HOST` cannot serve sites, a site is served on the app's own
+  origin at `/s/{slug}`, and every "view site" link points there. Previously
+  publishing wrote `publishedContent` that nothing could display, because
+  wildcard subdomains require a domain you own.
+
+  This trades away real isolation: published content is rendered on the origin
+  holding the session cookie, which is what the separate registrable domain
+  exists to prevent. It is defensible only while the account owner is the sole
+  author — nothing in the builder can currently author a script, since no block
+  type emits raw HTML and authored content never reaches
+  `dangerouslySetInnerHTML`. Setting a real sites host restores subdomain
+  serving and disables the `/s/` route automatically, with no code change; the
+  same-domain guard in `src/lib/env.ts` stays armed either way.
+
+  Internal links inside a preview carry a `basePath`, so nav stays inside the
+  site rather than resolving against the app's own routes.
+
 - `DEPLOY.md` documents deploying without custom domains. Vercel routes
   `<project>.vercel.app` but not `{slug}.<project>.vercel.app`, so the published
   surface — which `proxy.ts` reaches only by subdomain — has no reachable host
@@ -42,12 +60,6 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Deferred
 
-- **Published sites are not viewable on a domainless deploy.** Publishing writes
-  `publishedContent` as normal; nothing serves it. Serving it path-based on the
-  app host was considered and rejected: it would put customer-authored content
-  on the origin holding the session cookie, which is the exact risk the
-  split-domain design exists to prevent. Adding a sites domain resolves this
-  through configuration alone.
 - **The marketing page is unreachable in that mode**, because `/` redirects to
   `/dashboard` on the app surface. Routing the URL to the marketing surface
   would restore it but skip Supabase session refresh, which `proxy.ts` performs

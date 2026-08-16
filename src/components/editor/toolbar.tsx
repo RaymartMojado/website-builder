@@ -5,6 +5,7 @@ import Link from "next/link";
 import * as icons from "lucide-react";
 import { BREAKPOINTS } from "@/lib/document/types";
 import { EDIT_TARGETS, useEditor } from "@/store/editor";
+import { publishedUrl } from "@/lib/sites/subdomain";
 import { useEditorSite } from "./site-context";
 import { publishPageAction, type PageActionState } from "@/app/dashboard/pages/actions";
 
@@ -217,10 +218,4 @@ function SaveIndicator() {
       {copy}
     </span>
   );
-}
-
-function publishedUrl(subdomain: string): string {
-  const host = process.env.NEXT_PUBLIC_SITES_HOST ?? "sites.localhost:3000";
-  const protocol = host.includes("localhost") ? "http" : "https";
-  return `${protocol}://${subdomain}.${host}`;
 }

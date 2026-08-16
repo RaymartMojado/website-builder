@@ -2,7 +2,7 @@
 
 import { useActionState, useState } from "react";
 import { createSiteAction, type SiteActionState } from "./actions";
-import { suggestSubdomain } from "@/lib/sites/subdomain";
+import { sitesHostIsRoutable, suggestSubdomain } from "@/lib/sites/subdomain";
 
 const EMPTY: SiteActionState = {};
 
@@ -64,8 +64,11 @@ export function CreateSiteForm({
               className={fieldClass}
               placeholder="acme-coffee"
             />
+            {/* Showing ".sites.invalid" would advertise an address that can
+                never resolve. With no sites domain the site really does live
+                at /s/{subdomain}, so say that instead. */}
             <span className="whitespace-nowrap font-mono text-xs text-neutral-500">
-              .{sitesHost}
+              {sitesHostIsRoutable(sitesHost) ? `.${sitesHost}` : `→ /s/${subdomain || "…"}`}
             </span>
           </div>
         </div>

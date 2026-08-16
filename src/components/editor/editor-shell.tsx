@@ -12,6 +12,7 @@ import { Inspector } from "./inspector";
 import { Toolbar } from "./toolbar";
 import { SiteProvider, type EditorSite } from "./site-context";
 import { KeyboardHelp, useKeyboardShortcuts } from "./keyboard";
+import { publishedUrl } from "@/lib/sites/subdomain";
 
 /**
  * Editor layout: palette and layers on the left, canvas in the middle,
@@ -156,7 +157,7 @@ function SmallScreenNotice({ site }: { site: EditorSite }) {
       </p>
       <div className="flex flex-wrap justify-center gap-2">
         <a
-          href={`http://${site.subdomain}.${process.env.NEXT_PUBLIC_SITES_HOST ?? "sites.localhost:3000"}`}
+          href={publishedUrl(site.subdomain)}
           className="rounded border border-neutral-300 px-3 py-2 text-sm"
         >
           View the live site

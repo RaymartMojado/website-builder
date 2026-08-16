@@ -70,8 +70,43 @@ export function suggestSubdomain(siteName: string): string {
     .replace(/-$/, "");
 }
 
-export function publishedUrl(subdomain: string): string {
-  const host = process.env.NEXT_PUBLIC_SITES_HOST ?? "sites.localhost:3000";
+/** Path prefix for sites previewed on the app's own origin. */
+export const PREVIEW_PREFIX = "/s";
+
+/**
+ * Whether the configured sites host can actually serve a published site.
+ *
+ * Wildcard subdomains need a domain you own — `{slug}.myproject.vercel.app`
+ * does not resolve — so a deployment without one parks
+ * NEXT_PUBLIC_SITES_HOST on the reserved `.invalid` TLD (see DEPLOY.md).
+ * Reading that as "no sites domain" is what turns same-origin previews on,
+ * and configuring a real host turns them off again with no code change.
+ */
+export function sitesHostIsRoutable(
+  host: string = process.env.NEXT_PUBLIC_SITES_HOST ?? "",
+): boolean {
+  const bare = host.split(":")[0]!.toLowerCase();
+  return bare.length > 0 && bare !== "invalid" && !bare.endsWith(".invalid");
+}
+
+/**
+ * Where a published site can be reached.
+ *
+ * Falls back to a path on the app's own origin when there is no sites domain.
+ * That fallback gives up the cookie isolation the separate domain exists to
+ * provide — customer content ends up on the origin holding the session cookie
+ * — and is only defensible while the only author is the person who owns the
+ * account. It disappears the moment a real sites host is set.
+ */
+export function publishedUrl(
+  subdomain: string,
+  path: string = "/",
+  host: string = process.env.NEXT_PUBLIC_SITES_HOST ?? "sites.localhost:3000",
+): string {
+  const suffix = path === "/" ? "" : path;
+
+  if (!sitesHostIsRoutable(host)) return `${PREVIEW_PREFIX}/${subdomain}${suffix}`;
+
   const protocol = host.includes("localhost") ? "http" : "https";
-  return `${protocol}://${subdomain}.${host}`;
+  return `${protocol}://${subdomain}.${host}${suffix}`;
 }

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import { getPublishedPage, getPublishedSite } from "@/lib/sites/published";
+import { PREVIEW_PREFIX, sitesHostIsRoutable } from "@/lib/sites/subdomain";
 import { migrate } from "@/lib/document/migrate";
 import { DEFAULT_THEME, type Theme } from "@/lib/document/types";
 import { BASE_CSS, compileStyles } from "@/lib/styles/compile";
@@ -99,7 +100,12 @@ export default async function PublishedSitePage({
       theme,
     });
 
-  const links = { pagePaths: await pagePaths(site.id) };
+  // Empty on a real sites domain, where the site owns the whole origin and
+  // stored paths already resolve correctly. Set only for same-origin previews,
+  // where every internal path needs to keep the /s/{slug} prefix or it lands
+  // on the app instead.
+  const basePath = sitesHostIsRoutable() ? "" : `${PREVIEW_PREFIX}/${slug}`;
+  const links = { pagePaths: await pagePaths(site.id), basePath: basePath || undefined };
 
   return (
     <>
@@ -111,7 +117,8 @@ export default async function PublishedSitePage({
         footer={footer}
         // currentPath lets Nav mark the active link with aria-current, so it is
         // announced by a screen reader rather than only being a colour change.
-        ctx={{ links, mode: "published", currentPath: pathname }}
+        // It is compared against resolved hrefs, so it carries the same prefix.
+        ctx={{ links, mode: "published", currentPath: `${basePath}${pathname}` }}
       />
     </>
   );

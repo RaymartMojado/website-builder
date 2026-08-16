@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { routeHost } from "@/proxy";
+import { routeHost, routePreviewPath } from "@/proxy";
 
 /**
  * Host routing is a security boundary, not just ergonomics: it decides which
@@ -48,6 +48,37 @@ describe("host routing", () => {
     ];
     for (const host of hosts) {
       expect(routeHost(host).surface, `${host} must not reach the app`).not.toBe("app");
+    }
+  });
+});
+
+/**
+ * With no domain of your own there is nowhere to host {slug}.example.com, so
+ * previews fall back to a path on the app origin. That trade gives up the
+ * cookie isolation the separate domain exists to provide, so it must switch
+ * itself off the moment a real sites host is configured.
+ */
+describe("same-origin preview paths", () => {
+  it("stays off while a real sites host can serve sites", () => {
+    expect(routePreviewPath("/s/acme", "sites.localhost:3000")).toBeNull();
+    expect(routePreviewPath("/s/acme", "mybuilder.site")).toBeNull();
+  });
+
+  it("maps /s/{slug} onto the published surface when there is no sites domain", () => {
+    expect(routePreviewPath("/s/acme", "sites.invalid")).toEqual({ slug: "acme", path: "/" });
+    expect(routePreviewPath("/s/acme/about", "sites.invalid")).toEqual({
+      slug: "acme",
+      path: "/about",
+    });
+    expect(routePreviewPath("/s/acme/blog/hello", "sites.invalid")).toEqual({
+      slug: "acme",
+      path: "/blog/hello",
+    });
+  });
+
+  it("leaves ordinary app paths alone", () => {
+    for (const path of ["/", "/s", "/s/", "/dashboard", "/signin", "/site/acme"]) {
+      expect(routePreviewPath(path, "sites.invalid")).toBeNull();
     }
   });
 });
