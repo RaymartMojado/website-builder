@@ -1,0 +1,228 @@
+// Website Builder — data model
+//
+// Auth lives in Supabase's `auth` schema, which Supabase owns and Prisma does
+// not model. Our app data lives in `public`, which Prisma owns exclusively.
+//
+// `Profile` mirrors an `auth.users` row: same id (uuid), created by a database
+// trigger on signup. The foreign key to auth.users is added by raw SQL in the
+// migration, because Prisma does not model cross-schema relations here.
+//
+// Documents (page bodies, shared regions, symbols) are JSON columns holding a
+// PageDocument. Each has a draft/published pair on the same row so publishing
+// is a single atomic UPDATE.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Identity
+// ---------------------------------------------------------------------------
+
+/// Mirrors auth.users. Never insert into this directly — the handle_new_user
+/// trigger does it. Email verification state lives on auth.users, not here, so
+/// there is exactly one source of truth for it.
+model Profile {
+  id        String   @id @db.Uuid
+  email     String   @unique
+  name      String?
+  image     String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  sites        Site[]
+  subscription Subscription?
+  auditLogs    AuditLog[]
+
+  @@map("profiles")
+}
+
+// ---------------------------------------------------------------------------
+// Sites
+// ---------------------------------------------------------------------------
+
+enum SiteStatus {
+  ACTIVE
+  SUSPENDED // billing lapse or moderation action
+}
+
+model Site {
+  id        String     @id @default(cuid())
+  ownerId   String     @map("owner_id") @db.Uuid
+  name      String
+  subdomain String     @unique
+  status    SiteStatus @default(ACTIVE)
+
+  /// Site-wide design tokens: colors, fonts, spacing scale, radii.
+  theme Json @default("{}")
+
+  /// Shared regions. Same PageDocument format as a page body.
+  headerDraft   Json? @map("header_draft")
+  headerContent Json? @map("header_content")
+  footerDraft   Json? @map("footer_draft")
+  footerContent Json? @map("footer_content")
+
+  /// { primary: MenuItem[], footer: MenuItem[], ... }
+  menus Json @default("{}")
+
+  /// Custom code injection — Pro plan only. Relaxes this site's CSP.
+  headCode String? @map("head_code")
+  bodyCode String? @map("body_code")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  owner   Profile  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  pages   Page[]
+  symbols Symbol[]
+  assets  Asset[]
+
+  @@index([ownerId])
+  @@map("sites")
+}
+
+enum PageKind {
+  STANDARD
+  HOME
+  NOT_FOUND
+}
+
+model Page {
+  id       String   @id @default(cuid())
+  siteId   String   @map("site_id")
+  parentId String?  @map("parent_id") // organisation + path suggestion, not routing
+  order    Int      @default(0)
+  kind     PageKind @default(STANDARD)
+
+  path  String // "/", "/about", "/docs/getting-started"
+  title String
+  seo   Json   @default("{}")
+
+  hideHeader Boolean @default(false) @map("hide_header")
+  hideFooter Boolean @default(false) @map("hide_footer")
+
+  draftContent     Json  @map("draft_content")
+  publishedContent Json? @map("published_content")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  site     Site          @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  parent   Page?         @relation("PageTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children Page[]        @relation("PageTree")
+  versions PageVersion[]
+
+  @@unique([siteId, path])
+  @@index([siteId])
+  @@index([parentId])
+  @@map("pages")
+}
+
+model Symbol {
+  id     String @id @default(cuid())
+  siteId String @map("site_id")
+  name   String
+
+  draftContent     Json  @map("draft_content")
+  publishedContent Json? @map("published_content")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@unique([siteId, name])
+  @@index([siteId])
+  @@map("symbols")
+}
+
+model PageVersion {
+  id        String   @id @default(cuid())
+  pageId    String   @map("page_id")
+  content   Json
+  label     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  page Page @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@index([pageId, createdAt])
+  @@map("page_versions")
+}
+
+model Asset {
+  id        String   @id @default(cuid())
+  siteId    String   @map("site_id")
+  key       String   @unique // storage key, always prefixed with siteId/
+  url       String
+  mime      String
+  width     Int?
+  height    Int?
+  sizeBytes Int      @map("size_bytes")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  site Site @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([siteId])
+  @@map("assets")
+}
+
+// ---------------------------------------------------------------------------
+// Billing
+// ---------------------------------------------------------------------------
+
+model Subscription {
+  id                   String @id @default(cuid())
+  userId               String @unique @map("user_id") @db.Uuid
+  stripeCustomerId     String @unique @map("stripe_customer_id")
+  stripeSubscriptionId String @unique @map("stripe_subscription_id")
+
+  /// trialing | active | past_due | canceled | unpaid — Stripe's own vocabulary,
+  /// stored verbatim so there is no mapping layer to drift out of sync.
+  status  String
+  priceId String @map("price_id")
+
+  trialEndsAt       DateTime? @map("trial_ends_at")
+  currentPeriodEnd  DateTime  @map("current_period_end")
+  cancelAtPeriodEnd Boolean   @default(false) @map("cancel_at_period_end")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user Profile @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("subscriptions")
+}
+
+/// Webhook idempotency: Stripe retries, and double-provisioning is a real bug.
+model ProcessedWebhook {
+  eventId     String   @id @map("event_id")
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@map("processed_webhooks")
+}
+
+// ---------------------------------------------------------------------------
+// Audit
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?  @map("user_id") @db.Uuid
+  action     String // "site.create", "auth.login.failed", ...
+  targetType String?  @map("target_type")
+  targetId   String?  @map("target_id")
+  ip         String?
+  meta       Json     @default("{}")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user Profile? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}
