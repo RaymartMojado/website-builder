@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { widthPercentFrom } from "@/components/editor/resize-handles";
-import { widthAsPercent } from "@/components/editor/size-control";
+import { heightAsPx, widthAsPercent } from "@/components/editor/size-control";
 
 /**
  * Resize maths.
@@ -65,6 +65,30 @@ describe("reading an existing width", () => {
     // would move the slider to a position that does not match the element.
     for (const value of ["320px", "auto", "", "100", "50 %", "calc(50%)"]) {
       expect(widthAsPercent(value), value).toBeNull();
+    }
+  });
+});
+
+/**
+ * Height is offered in pixels, not percentages. A percentage height resolves
+ * against the parent's height, which is usually auto, so it silently does
+ * nothing — the opposite of the width control, where a percentage is the
+ * answer that keeps working on a narrow screen.
+ */
+describe("height parsing", () => {
+  it("reads a pixel height", () => {
+    expect(heightAsPx("48px")).toBe(48);
+    expect(heightAsPx(" 24px ")).toBe(24);
+    expect(heightAsPx("120.5px")).toBe(120.5);
+  });
+
+  it("reads a bare number as pixels, since that is what people type", () => {
+    expect(heightAsPx("48")).toBe(48);
+  });
+
+  it("returns null for anything it cannot size", () => {
+    for (const value of ["", "auto", "50%", "3rem", "min-content", "abc"]) {
+      expect(heightAsPx(value), value).toBeNull();
     }
   });
 });

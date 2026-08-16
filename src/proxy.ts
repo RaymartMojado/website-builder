@@ -114,9 +114,6 @@ export async function proxy(request: NextRequest) {
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
   requestHeaders.set("x-surface", surface);
-  // Server components cannot read the pathname; layouts need it to decide
-  // whether to render chrome around a full-viewport route like the editor.
-  requestHeaders.set("x-pathname", request.nextUrl.pathname);
   requestHeaders.set("Content-Security-Policy", headers["Content-Security-Policy"]!);
 
   let response: NextResponse;

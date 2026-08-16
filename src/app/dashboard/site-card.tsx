@@ -19,7 +19,6 @@ export interface SitePage {
 export function SiteCard({
   id,
   name,
-  subdomain,
   status,
   url,
   updatedAt,
@@ -27,7 +26,6 @@ export function SiteCard({
 }: {
   id: string;
   name: string;
-  subdomain: string;
   status: string;
   url: string;
   updatedAt: string;
@@ -84,15 +82,7 @@ export function SiteCard({
                   </span>
                 ) : null}
               </div>
-              <a
-                href={url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-mono text-xs text-blue-700 underline underline-offset-2"
-              >
-                {subdomain}
-              </a>
-              <p className="mt-1 font-mono text-[11px] uppercase tracking-wide text-neutral-400">
+              <p className="font-mono text-[11px] uppercase tracking-wide text-neutral-400">
                 Updated {new Date(updatedAt).toLocaleDateString()}
               </p>
             </>
@@ -101,6 +91,18 @@ export function SiteCard({
 
         {!editing ? (
           <div className="flex shrink-0 items-center gap-2">
+            {/* The address used to sit under the title as a bare link. It read
+                as metadata rather than an action, and on a deployment with no
+                sites domain it is a path rather than a hostname, which is not
+                something worth showing to be read. */}
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm transition-colors hover:bg-neutral-100"
+            >
+              Preview
+            </a>
             <button
               type="button"
               onClick={() => setEditing(true)}

@@ -9,6 +9,29 @@ this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ### Fixed
 
+- Opening the editor from the dashboard no longer wraps it in the dashboard's
+  chrome. The layout decided whether to render the header, trial banner and
+  centred column by reading the request pathname from a header, but Next reuses
+  a shared layout across client-side navigations rather than re-rendering it —
+  so a soft navigation into the editor kept the chrome rendered for the
+  dashboard, squeezing a full-viewport tool into `max-w-5xl`, and a manual
+  refresh appeared to fix it. The chrome moved into a `(chrome)` route group
+  beside the editor, so the router picks it per route. URLs are unchanged.
+- `getCurrentUser` is now deduplicated per request, so the auth boundary and the
+  chrome layout share one verification against the auth server instead of two.
+
+### Added
+
+- Height has a slider and a number box in the inspector, beside width. It was
+  reachable only by typing an exact value such as `48px` into a text field —
+  the knowledge the size presets exist to avoid requiring. This matters for
+  images and logos, whose side handles write width only, so scaling one meant
+  setting a height first.
+- Site cards have a Preview button. The address sat under the title as a bare
+  link, which read as metadata rather than an action, and on a deployment with
+  no sites domain it is a path rather than a hostname — not something worth
+  showing to be read.
+
 - A Logo's image now honours the styles set on it. The `<img>` carried a
   hardcoded inline `width: auto`, and an inline style outranks the compiled
   class, so resizing the node stretched the anchor while the picture inside it

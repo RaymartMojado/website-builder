@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
@@ -44,10 +45,12 @@ export async function createSupabaseServerClient() {
  * verifying it against the auth server, so a forged cookie would pass. This is
  * the single most common Supabase auth mistake.
  */
-export async function getCurrentUser() {
+// Deduped per request: the auth boundary and the chrome layout both need the
+// user, and without this each call is a separate round trip to the auth server.
+export const getCurrentUser = cache(async () => {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   return user;
-}
+});

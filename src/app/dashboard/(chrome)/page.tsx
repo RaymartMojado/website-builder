@@ -2,8 +2,8 @@ import { requireUserId } from "@/lib/auth/guards";
 import { getEntitlement } from "@/lib/billing/entitlement";
 import { publishedUrl } from "@/lib/sites/subdomain";
 import { db } from "@/lib/db";
-import { CreateSiteForm } from "./create-site-form";
-import { SiteCard } from "./site-card";
+import { CreateSiteForm } from "../create-site-form";
+import { SiteCard } from "../site-card";
 
 export const metadata = { title: "Your sites · Website Builder" };
 
@@ -52,7 +52,6 @@ export default async function DashboardPage() {
               key={site.id}
               id={site.id}
               name={site.name}
-              subdomain={site.subdomain}
               status={site.status}
               url={publishedUrl(site.subdomain)}
               updatedAt={site.updatedAt.toISOString()}
